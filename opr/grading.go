@@ -7,7 +7,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"sort"
-	"strings"
 	"sync"
 
 	"github.com/FactomProject/factom"
@@ -101,7 +100,10 @@ func RemoveDuplicateMiningIDs(list []*OraclePriceRecord) (nlist []*OraclePriceRe
 	highest := make(map[string]int)
 
 	for i, v := range list {
-		id := strings.Join(v.FactomDigitalID, "-")
+		//id := strings.Join(v.FactomDigitalID, "-")
+
+		// Need unique Nonce + oprhash.
+		id := string(append(v.Entry.ExtIDs[0], v.OPRHash...))
 
 		if dupe, ok := highest[id]; ok { // look for duplicates
 			if v.Difficulty <= list[dupe].Difficulty { // less then, we ignore
