@@ -33,13 +33,21 @@ func ConvertAddress(address string) (prefix string, adr [32]byte, err error) {
 	return
 }
 
-func (b *BalanceTracker) AssetHumanReadable(prefix string) map[string]int64 {
+func (b *BalanceTracker) AssetHumanReadable(prefix string) map[string]string {
 	b.Lock()
 	defer b.Unlock()
-	r := make(map[string]int64)
+	r := make(map[string]string)
+	total := int64(0)
 	for k, v := range b.Balances[prefix] {
-		r[common.ConvertRawToFCT(k[:])] = v
+		r[common.ConvertRawToFCT(k[:])] = fmt.Sprintf("%d", v/1e8)
+		total += v / 1e8
 	}
+
+	for k, v := range b.Balances[prefix] {
+		r[common.ConvertRawToFCT(k[:])+"%"] = fmt.Sprintf("%.2f%%", float64(v/1e8)/float64(total)*100)
+	}
+
+	r["all"] = fmt.Sprintf("%d", total)
 	return r
 }
 
