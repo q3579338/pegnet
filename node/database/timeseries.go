@@ -103,6 +103,7 @@ type AssetPricingTimeSeries struct {
 
 type UniqueGradedCoinbasesTimeSeries struct {
 	TimeSeries
+	BiggestMiner           int // Amount of records from the best miner in top 50
 	UniqueGradedCoinbases  int
 	UniqueWinningCoinbases int
 }
