@@ -13,6 +13,11 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+const (
+	// 0.5%
+	GradeBand float64 = 0.005
+)
+
 // Avg computes the average answer for the price of each token reported
 func Avg(list []*OraclePriceRecord) (avg []float64) {
 	avg = make([]float64, len(common.AllAssets))
@@ -41,16 +46,25 @@ func Avg(list []*OraclePriceRecord) (avg []float64) {
 }
 
 // CalculateGrade takes the averages and grades the individual OPRs
-func CalculateGrade(avg []float64, opr *OraclePriceRecord) float64 {
+func CalculateGrade(avg []float64, opr *OraclePriceRecord, band float64) float64 {
 	tokens := opr.GetTokens()
 	opr.Grade = 0
 	for i, v := range tokens {
 		if avg[i] > 0 {
 			d := (v.value - avg[i]) / avg[i] // compute the difference from the average
+			d = ApplyBand(d, band)           // Apply the band curve
 			opr.Grade = opr.Grade + d*d*d*d  // the grade is the sum of the square of the square of the differences
 		}
 	}
 	return opr.Grade
+}
+
+// ApplyBand
+func ApplyBand(diff float64, band float64) float64 {
+	if diff <= band {
+		return 0
+	}
+	return diff - band
 }
 
 // GradeMinimum only grades the top 50 honest records. The input must be the records sorted by
@@ -81,10 +95,15 @@ func GradeMinimum(sortedList []*OraclePriceRecord) (graded []*OraclePriceRecord)
 		}
 	}
 
-	for i := len(top50); i >= 10; i-- {
+	for i := len(top50); i >= 1; i-- {
 		avg := Avg(top50[:i])
+		// Use the gradeband up to 25 records
+		band := GradeBand
+		if i < 25 {
+			band = 0
+		}
 		for j := 0; j < i; j++ {
-			CalculateGrade(avg, top50[j])
+			CalculateGrade(avg, top50[j], band)
 		}
 		// Because this process can scramble the sorted fields, we have to resort with each pass.
 		sort.SliceStable(top50[:i], func(i, j int) bool { return top50[i].Difficulty > top50[j].Difficulty })
@@ -118,7 +137,7 @@ func GradeBlock(list []*OraclePriceRecord) (graded []*OraclePriceRecord, sorted 
 	for i := len(topDifficulty); i >= 10; i-- {
 		avg := Avg(topDifficulty[:i])
 		for j := 0; j < i; j++ {
-			CalculateGrade(avg, topDifficulty[j])
+			CalculateGrade(avg, topDifficulty[j], 0)
 		}
 		// Because this process can scramble the sorted fields, we have to resort with each pass.
 		sort.SliceStable(topDifficulty[:i], func(i, j int) bool { return topDifficulty[i].Difficulty > topDifficulty[j].Difficulty })
@@ -153,6 +172,7 @@ type OprBlock struct {
 
 // VerifyWinners takes an opr and compares its list of winners to the winners of previousHeight
 func VerifyWinners(opr *OraclePriceRecord, winners []*OraclePriceRecord) bool {
+	return true
 	for i, w := range opr.WinPreviousOPR {
 		if winners == nil && w != "" {
 			return false
@@ -165,9 +185,10 @@ func VerifyWinners(opr *OraclePriceRecord, winners []*OraclePriceRecord) bool {
 }
 
 func GetRewardFromPlace(place int) int64 {
-	if place >= 10 {
+	if place >= 25 {
 		return 0 // There's no participation trophy. Return zero.
 	}
+	return 200 * 1e8
 	switch place {
 	case 0:
 		return 800 * 1e8 // The Big Winner

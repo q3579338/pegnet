@@ -267,7 +267,7 @@ func (g *QuickGrader) Sync() error {
 			g.oprBlkLock.Unlock()
 
 			// Let's add the winner's rewards. They will be happy that we do this step :)
-			for place, winner := range oprblock.GradedOPRs[:10] { // Only top 10 matter
+			for place, winner := range oprblock.GradedOPRs[:25] { // Only top 10 matter
 				reward := GetRewardFromPlace(place)
 				if reward > 0 {
 					err := g.Balances.AddToBalance(winner.CoinbasePNTAddress, reward)
