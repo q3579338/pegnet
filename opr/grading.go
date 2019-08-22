@@ -7,6 +7,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"math"
 	"sort"
 
 	"github.com/pegnet/pegnet/common"
@@ -52,7 +53,7 @@ func CalculateGrade(avg []float64, opr *OraclePriceRecord, band float64) float64
 	for i, v := range tokens {
 		if avg[i] > 0 {
 			d := (v.value - avg[i]) / avg[i] // compute the difference from the average
-			d = ApplyBand(d, band)           // Apply the band curve
+			d = ApplyBand(d, GradeBand)      // Apply the band curve
 			opr.Grade = opr.Grade + d*d*d*d  // the grade is the sum of the square of the square of the differences
 		}
 	}
@@ -95,7 +96,7 @@ func GradeMinimum(sortedList []*OraclePriceRecord) (graded []*OraclePriceRecord)
 		}
 	}
 
-	for i := len(top50); i >= 1; i-- {
+	for i := len(top50); i >= 25; i-- {
 		avg := Avg(top50[:i])
 		// Use the gradeband up to 25 records
 		band := GradeBand
@@ -109,6 +110,41 @@ func GradeMinimum(sortedList []*OraclePriceRecord) (graded []*OraclePriceRecord)
 		sort.SliceStable(top50[:i], func(i, j int) bool { return top50[i].Difficulty > top50[j].Difficulty })
 		sort.SliceStable(top50[:i], func(i, j int) bool { return top50[i].Grade < top50[j].Grade })
 	}
+
+	avg := Avg(top50)
+	totald := make(map[string]float64)
+	amt := make(map[string]int)
+	for i := range avg {
+		for _, o := range top50[:] {
+			d := (o.GetTokens()[i].value - avg[i]) / avg[i] // compute the difference from the average
+			if d < 5 {
+				totald[o.GetTokens()[i].code] += d
+				amt[o.GetTokens()[i].code] += 1
+			}
+		}
+	}
+
+	avg = Avg(top50[:20])
+	oprOut := 0
+	for _, o := range top50 {
+		for i, token := range o.GetTokens() {
+			if math.Abs(token.value-avg[i])/avg[i] > 0.05 {
+				if token.code == "JPY" || token.code == "XPT" || token.code == "XPD" || token.code == "INR" || token.code == "CNY" || token.code == "HKD" {
+					//continue
+				}
+				//fmt.Println(o.FactomDigitalID, token.code, token.value, avg[i])
+				oprOut++
+				break
+			}
+		}
+	}
+
+	//if sortedList[0].Dbht%20 == 0 {
+	fmt.Printf("%d -- %d outside band \n", sortedList[0].Dbht, oprOut)
+	//for k := range totald {
+	//	fmt.Printf("\t%s AvgDiff: %.3f\n", k, totald[k]/float64(amt[k]))
+	//}
+	//}
 	return top50
 }
 
